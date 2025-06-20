@@ -3,13 +3,17 @@ package com.example.ptpt.controller;
 import com.example.ptpt.dto.request.CommentRequest;
 import com.example.ptpt.dto.request.FeedRequest;
 import com.example.ptpt.dto.response.*;
+import com.example.ptpt.enums.ApiResponseCode;
 import com.example.ptpt.enums.FeedType;
+import com.example.ptpt.exception.AuthServiceException;
 import com.example.ptpt.service.FeedService;
+import com.example.ptpt.util.JwtUtil;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -17,6 +21,7 @@ import org.springframework.data.domain.Sort;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.util.StringUtils;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.server.ResponseStatusException;
@@ -25,6 +30,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 
+@Slf4j
 @Tag(name = "피드", description = "피드 관련 API")
 @RestController
 @RequestMapping("/api/feeds")
@@ -32,6 +38,8 @@ import java.util.Objects;
 public class FeedController {
 
     private final FeedService feedService;
+
+    private final JwtUtil jwtUtil;
 
     @Operation(
             summary = "피드 목록 조회",
@@ -50,8 +58,14 @@ public class FeedController {
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size,
             @RequestParam(required = false) FeedType type,
-            @RequestParam Long userId) {
+            @RequestHeader("Authorization") String authorization) {
         Pageable pageable = PageRequest.of(page, size);
+
+        // 토큰에서 사용자 ID 추출
+        Long userId = jwtUtil.extractUserIdFromToken(authorization);
+
+        log.info("피드 조회 요청 - userId: {}, page: {}, size: {}, type: {}", userId, page, size, type);
+
         Page<FeedResponse> feeds = feedService.getFeeds(pageable,type,userId);
         return ResponseEntity.ok(feeds);
     }

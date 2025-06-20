@@ -42,7 +42,8 @@ public class SecurityConfig {
                         .requestMatchers("/swagger-ui/**", "/v3/api-docs/**",
                                 "/swagger-ui.html", "/webjars/**",
                                 "/swagger-resources/**").permitAll()
-                        .requestMatchers("/actuator/health").permitAll()
+                        .requestMatchers("/feeds/images/**").permitAll()
+                        .requestMatchers("/profiles/images/**").permitAll()
                         // 나머지는 JWT 인증 필요
                         .anyRequest().authenticated())
                 .build();

@@ -34,6 +34,7 @@ server:
 # Swagger UI 설정
 springdoc:
 #  server-url: https://ptpt.ngrok.app
+  server-url: https://e9d2-59-8-4-136.ngrok-free.app
   swagger-ui:
     path: /swagger-ui.html
   api-docs:

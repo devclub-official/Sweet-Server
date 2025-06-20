@@ -16,15 +16,15 @@ import java.util.Collections;
 @Configuration
 public class SwaggerConfig {
 
-//    @Value("${springdoc.server-url}")
-//    private String serverUrl;
+    @Value("${springdoc.server-url}")
+    private String serverUrl;
 
     @Bean
     public OpenAPI customOpenAPI() {
 
 //        https://kwakscoding.tistory.com/49
         Server server = new Server();
-//        server.setUrl(serverUrl);
+        server.setUrl(serverUrl);
 
         return new OpenAPI()
                 .components(new Components()

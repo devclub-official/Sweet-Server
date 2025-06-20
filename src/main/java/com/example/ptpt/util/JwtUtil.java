@@ -1,11 +1,14 @@
 package com.example.ptpt.util;
 
+import com.example.ptpt.enums.ApiResponseCode;
+import com.example.ptpt.exception.AuthServiceException;
 import com.example.ptpt.exception.token.*;
 import io.jsonwebtoken.*;
 import io.jsonwebtoken.security.Keys;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
+import org.springframework.util.StringUtils;
 
 import javax.crypto.SecretKey;
 import java.nio.charset.StandardCharsets;
@@ -93,6 +96,37 @@ public class JwtUtil {
         final Claims claims = extractAllClaims(token);
         return claimsResolver.apply(claims);
     }
+
+    /**
+     * Authorization 헤더에서 JWT 토큰을 추출하고 사용자 ID를 반환
+     */
+    public Long extractUserIdFromToken(String authorization) {
+        if (!StringUtils.hasText(authorization) || !authorization.startsWith("Bearer ")) {
+            throw new AuthServiceException(ApiResponseCode.AUTH_TOKEN_INVALID, "유효하지 않은 토큰입니다.");
+        }
+
+        String token = authorization.substring(7);
+
+        Long userId = null;
+        try {
+            // JWT에서 userId claim 추출 (String으로 저장된 경우)
+            userId = extractClaim(token, claims -> claims.get("userId", Long.class));
+
+            if (userId == null) {
+                throw new AuthServiceException(ApiResponseCode.AUTH_TOKEN_INVALID, "토큰에 사용자 정보가 없습니다.");
+            }
+
+            return userId;
+
+        } catch (NumberFormatException e) {
+            log.error("사용자 ID 파싱 실패: {}", userId, e);
+            throw new AuthServiceException(ApiResponseCode.AUTH_TOKEN_INVALID, "토큰의 사용자 정보가 올바르지 않습니다.");
+        } catch (Exception e) {
+            log.error("토큰 파싱 실패", e);
+            throw new AuthServiceException(ApiResponseCode.AUTH_TOKEN_INVALID, "토큰 파싱에 실패했습니다.");
+        }
+    }
+
 
     /**
      * 토큰 만료 여부 확인
