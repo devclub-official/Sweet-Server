@@ -5,46 +5,69 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.web.servlet.config.annotation.ResourceHandlerRegistry;
 import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+
+/**
+ * 정적 리소스 URL 패턴과 실제 파일 시스템 경로를
+ * 프로젝트 루트(user.dir) 기준으로 매핑합니다.
+ */
 @Configuration
 public class WebConfig implements WebMvcConfigurer {
-    // 피드 이미지
+
     @Value("${ptpt.upload.urlPrefix}")
     private String feedUrlPrefix;
+
     @Value("${ptpt.upload.imagePath}")
     private String feedImagePath;
 
-    // 프로필 이미지
     @Value("${ptpt.upload.profileUrlPrefix}")
     private String profileUrlPrefix;
+
     @Value("${ptpt.upload.profileImagePath}")
     private String profileImagePath;
-    /**
-     * 개발용 피드 이미지 관련 불러오기 설정 (urlPrefix, imagePath 프로퍼티 사용)
-     */
 
     @Override
     public void addResourceHandlers(ResourceHandlerRegistry registry) {
-        // 1) 피드 이미지 핸들러 등록
+        // 피드 이미지
         registry.addResourceHandler(toPattern(feedUrlPrefix))
-                .addResourceLocations(toLocation(feedImagePath));
-
-        // 2) 프로필 이미지 핸들러 등록
+                .addResourceLocations(resolveLocation(feedImagePath));
+        // 프로필 이미지
         registry.addResourceHandler(toPattern(profileUrlPrefix))
-                .addResourceLocations(toLocation(profileImagePath));
+                .addResourceLocations(resolveLocation(profileImagePath));
     }
 
     /**
-     * "/prefix/**" 형태의 패턴으로 변환
+     * URL 패턴을 '**' 와 함께 반환
      */
     private String toPattern(String prefix) {
-        String p = prefix.endsWith("/") ? prefix : prefix + "/";
-        return p + "**";
+        return (prefix.endsWith("/") ? prefix : prefix + "/") + "**";
     }
 
     /**
-     * 파일 시스템 또는 classpath 리소스 경로로 변환
+     * raw 경로(file: 생략 가능)를 프로젝트 루트 기준의 절대 파일 시스템 경로로 변환
      */
-    private String toLocation(String path) {
-        return path.endsWith("/") ? path : path + "/";
+    private String resolveLocation(String raw) {
+        if (raw.startsWith("classpath:") || raw.startsWith("file:/")) {
+            return raw.endsWith("/") ? raw : raw + "/";
+        }
+
+        String sub = raw.startsWith("file:") ? raw.substring(5) : raw;
+        Path root = Paths.get(System.getProperty("user.dir"));
+        Path abs = root.resolve(sub).normalize();
+        createDir(abs);
+        return "file:" + abs.toString() + "/";
+    }
+
+    /**
+     * 디렉터리가 없으면 생성
+     */
+    private void createDir(Path dir) {
+        try {
+            Files.createDirectories(dir);
+        } catch (IOException ignored) {
+        }
     }
 }

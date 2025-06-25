@@ -51,8 +51,8 @@ ptpt:
   upload:
     # feed 이미지 설정(기존)
     urlPrefix:  /feeds/images/
-    imagePath:  classpath:img/feed
+    imagePath:  file:img/feed
 
     # profile 이미지 설정(추가)
     profileUrlPrefix:  /profiles/images/
-    profileImagePath:  classpath:img/profile
+    profileImagePath:  file:img/profile

@@ -11,12 +11,11 @@ import com.example.ptpt.enums.FeedType;
 import com.example.ptpt.enums.FeedVisibility;
 import com.example.ptpt.repository.*;
 import com.example.ptpt.service.FeedService;
+import jakarta.annotation.PostConstruct;
 import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.core.io.ClassPathResource;
-import org.springframework.core.io.Resource;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
@@ -27,6 +26,9 @@ import org.springframework.web.server.ResponseStatusException;
 
 import java.io.File;
 import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
@@ -43,31 +45,65 @@ public class FeedServiceImpl implements FeedService {
     private final FollowsRepository followRepository;
     private final CommentRepository commentRepository;
 
-    @Value("${ptpt.upload.imagePath:classpath:/img/feed}")
-    private String imageUploadPath;
+    // application.yml 에 설정된 원본 경로 (예: "file:img/feed")
+    // 업로드 디렉터리 계산 시 사용
+    @Value("${ptpt.upload.imagePath}")
+    private String rawImagePath;
 
+    // initImageDir() 에서 계산된 실제 업로드 경로 저장
+    private Path imageDir;
+
+    // 클라이언트가 이미지 조회할 때 앞에 붙는 URL 경로 접두어
     @Value("${ptpt.upload.urlPrefix:/feeds/images/}")
     private String imageUrlPrefix;
 
+    // 클라이언트가 프로필 이미지 조회할 때 앞에 붙는 URL 경로 접두어
     @Value("${ptpt.upload.profileUrlPrefix:/profiles/images/}")
     private String profileUrlPrefix;
+
+    @PostConstruct
+    public void initImageDir() throws IOException {
+        String sub = rawImagePath.startsWith("file:")
+                ? rawImagePath.substring("file:".length())
+                : rawImagePath;  // => "img/feed"
+
+        String projectRoot = System.getProperty("user.dir");
+        Path rootPath = Paths.get(projectRoot);
+        imageDir = rootPath.resolve(sub).toAbsolutePath().normalize();
+        Files.createDirectories(imageDir);
+    }
 
     @Override
     public Page<FeedResponse> getFeeds(Pageable pageable, FeedType type, Long currentUserId) {
         List<Long> followingIds = followRepository.findFollowingIdsByFollowerId(currentUserId);
 
         Page<Feed> feedPage;
-        if (type == FeedType.FOLLOWING) {
-            feedPage = feedRepository.findByUserIdIn(followingIds, pageable);
-        } else {  // UNFOLLOWED
-            List<Long> exclude = new ArrayList<>(followingIds);
-            exclude.add(currentUserId);
-            feedPage = feedRepository.findByUserIdNotIn(exclude, pageable);
+        switch (type) {
+            case FOLLOWING -> {
+                // 팔로우 중인 유저가 없으면 빈 페이지 반환
+                if (followingIds.isEmpty()) {
+                    return Page.empty(pageable);
+                }
+                feedPage = feedRepository.findByUserIdIn(followingIds, pageable);
+            }
+            case UNFOLLOWED -> {
+                if (followingIds.isEmpty()) {
+                    // 나 자신만 제외
+                    feedPage = feedRepository.findByUserIdNot(currentUserId, pageable);
+                } else {
+                    List<Long> exclude = new ArrayList<>(followingIds);
+                    exclude.add(currentUserId);
+                    feedPage = feedRepository.findByUserIdNotIn(exclude, pageable);
+                }
+            }
+            default -> {
+                // 타입이 없거나 다른 경우 전체 피드
+                feedPage = feedRepository.findAll(pageable);
+            }
         }
 
-        return feedPage.map(feed -> convertToDto(feed,currentUserId));
+        return feedPage.map(f -> convertToDto(f, currentUserId));
     }
-
     @Override
     public FeedDetailResponse getFeedById(Long id,Long currentUserId) {
         Feed feed = feedRepository.findById(id)
@@ -143,21 +179,7 @@ public class FeedServiceImpl implements FeedService {
     }
 
     private File getUploadDir() {
-        if (imageUploadPath.startsWith("classpath:")) {
-            String path = imageUploadPath.substring("classpath:".length());
-            Resource resource = new ClassPathResource(path);
-            try {
-                File uploadDir = resource.getFile();
-                if (!uploadDir.exists()) uploadDir.mkdirs();
-                return uploadDir;
-            } catch (IOException e) {
-                throw new RuntimeException("Unable to get upload directory.", e);
-            }
-        } else {
-            File uploadDir = new File(imageUploadPath);
-            if (!uploadDir.exists()) uploadDir.mkdirs();
-            return uploadDir;
-        }
+        return imageDir.toFile();
     }
 
     private void deletePhysicalFile(FeedImages feedImages) {
@@ -182,19 +204,22 @@ public class FeedServiceImpl implements FeedService {
         File uploadDir = getUploadDir();
 
         for (MultipartFile file : files) {
-            String originalFilename = file.getOriginalFilename();
-            if (originalFilename == null || originalFilename.isEmpty()) continue;
-            File destination = new File(uploadDir, originalFilename);
+            String original = file.getOriginalFilename();
+            if (original == null || original.isEmpty()) continue;
+
+            File dest = new File(uploadDir, original);
             try {
-                file.transferTo(destination);
-                String publicUrl = imageUrlPrefix + originalFilename;
+                file.transferTo(dest);
+
                 feedImagesRepository.save(FeedImages.builder()
                         .feed(feed)
-                        .imageUrl(originalFilename)
+                        .imageUrl(original)
                         .build());
-                imageUrls.add(publicUrl);
+
+                imageUrls.add(imageUrlPrefix + original);
+
             } catch (IOException e) {
-                throw new RuntimeException("File upload failed for " + originalFilename, e);
+                throw new RuntimeException("파일 업로드 실패: " + original, e);
             }
         }
         return imageUrls;

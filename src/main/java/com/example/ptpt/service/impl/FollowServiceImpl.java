@@ -1,6 +1,7 @@
 package com.example.ptpt.service.impl;
 
 import com.example.ptpt.dto.response.UserResponse;
+import com.example.ptpt.dto.response.FollowSuggestionResponse;
 import com.example.ptpt.entity.Follows;
 import com.example.ptpt.entity.UserEntity;
 import com.example.ptpt.repository.FollowsRepository;
@@ -11,6 +12,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.NoSuchElementException;
 
@@ -42,8 +44,9 @@ public class FollowServiceImpl implements FollowService {
     }
 
     @Override
+    @Transactional
     public void unfollow(Long followerId, Long targetUserId) {
-        followRepo.deleteByFollowerIdAndFollowingId(followerId, targetUserId);
+        followRepo.deleteByFollower_IdAndFollowing_Id(followerId, targetUserId);
     }
 
     @Override
@@ -88,5 +91,16 @@ public class FollowServiceImpl implements FollowService {
     @Override
     public boolean isFollowing(Long followerId, Long targetUserId) {
         return followRepo.existsByFollowerIdAndFollowingId(followerId, targetUserId);
+    }
+
+    @Override
+    public Page<FollowSuggestionResponse> getUnfollowedUsers(Long currentUserId, Pageable pageable) {
+        return userRepo
+                .findUnfollowedUsers(currentUserId, pageable)
+                .map(u -> new FollowSuggestionResponse(
+                        u.getId(),
+                        u.getNickname(),
+                        u.getProfileImage()
+                ));
     }
 }

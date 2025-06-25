@@ -2,10 +2,7 @@ package com.example.ptpt.entity;
 
 import com.example.ptpt.enums.FeedVisibility;
 import jakarta.persistence.*;
-import lombok.AllArgsConstructor;
-import lombok.Builder;
-import lombok.Data;
-import lombok.NoArgsConstructor;
+import lombok.*;
 
 import java.time.Instant;
 import java.util.ArrayList;
@@ -13,10 +10,11 @@ import java.util.List;
 
 @Entity
 @Table(name = "feeds")
-@Data
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
+@Setter
+@Getter
 public class Feed {
 
     @Id
