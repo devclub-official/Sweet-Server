@@ -2,6 +2,7 @@ package com.example.ptpt.controller;
 
 import com.example.ptpt.dto.response.FollowStatusResponse;
 import com.example.ptpt.dto.response.UserResponse;
+import com.example.ptpt.dto.response.FollowSuggestionResponse;
 import com.example.ptpt.service.FollowService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -113,5 +114,22 @@ public class FollowController {
                 .following(following)
                 .build();
         return ResponseEntity.ok(dto);
+    }
+
+    @Operation(summary = "추천 팔로우 대상 사용자 목록 조회", description = "현재 사용자가 팔로우하지 않은 사용자 목록을 페이징 조회합니다.")
+    @GetMapping("/suggestions")
+    public ResponseEntity<Page<FollowSuggestionResponse>> getSuggestions(
+            @Parameter(description = "조회하는 사용자 ID", example = "1", required = true)
+            @RequestParam Long userId,
+
+            @Parameter(description = "페이지 번호 (0부터 시작)", example = "0")
+            @RequestParam(defaultValue = "0") int page,
+
+            @Parameter(description = "페이지당 항목 수", example = "20")
+            @RequestParam(defaultValue = "20") int size
+    ) {
+        PageRequest pageable = PageRequest.of(page, size, Sort.by("nickname").ascending());
+        Page<FollowSuggestionResponse> suggestions = followService.getUnfollowedUsers(userId, pageable);
+        return ResponseEntity.ok(suggestions);
     }
 }

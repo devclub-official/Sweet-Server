@@ -78,17 +78,32 @@ public class FeedServiceImpl implements FeedService {
         List<Long> followingIds = followRepository.findFollowingIdsByFollowerId(currentUserId);
 
         Page<Feed> feedPage;
-        if (type == FeedType.FOLLOWING) {
-            feedPage = feedRepository.findByUserIdIn(followingIds, pageable);
-        } else {  // UNFOLLOWED
-            List<Long> exclude = new ArrayList<>(followingIds);
-            exclude.add(currentUserId);
-            feedPage = feedRepository.findByUserIdNotIn(exclude, pageable);
+        switch (type) {
+            case FOLLOWING -> {
+                // 팔로우 중인 유저가 없으면 빈 페이지 반환
+                if (followingIds.isEmpty()) {
+                    return Page.empty(pageable);
+                }
+                feedPage = feedRepository.findByUserIdIn(followingIds, pageable);
+            }
+            case UNFOLLOWED -> {
+                if (followingIds.isEmpty()) {
+                    // 나 자신만 제외
+                    feedPage = feedRepository.findByUserIdNot(currentUserId, pageable);
+                } else {
+                    List<Long> exclude = new ArrayList<>(followingIds);
+                    exclude.add(currentUserId);
+                    feedPage = feedRepository.findByUserIdNotIn(exclude, pageable);
+                }
+            }
+            default -> {
+                // 타입이 없거나 다른 경우 전체 피드
+                feedPage = feedRepository.findAll(pageable);
+            }
         }
 
-        return feedPage.map(feed -> convertToDto(feed,currentUserId));
+        return feedPage.map(f -> convertToDto(f, currentUserId));
     }
-
     @Override
     public FeedDetailResponse getFeedById(Long id,Long currentUserId) {
         Feed feed = feedRepository.findById(id)
